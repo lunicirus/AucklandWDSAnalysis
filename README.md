@@ -1,2 +1,3 @@
 # AucklandWDSAnalysis
-Water pipe failure data analysis of the city of Auckland, New Zealand
+Water pipe failure analysis for the city of Auckland, New Zealand
+The data is property of Watercare (i.e., Auckland's water utility) and not updated here.
