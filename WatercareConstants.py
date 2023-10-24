@@ -1,0 +1,20 @@
+#Constants from Watercare files
+SR_PROB = "SR_PROB"
+WMN = 'WMN'
+WSL = 'WSL'
+WMNRM = "WMNRM"
+WMNRPL = "WMNRPL"
+ACTCODE = "ACTCODE"
+WONO = "WONO"
+COMPKEY = "COMPKEY"
+SERVNO = "SERVNO"
+ADDDTTM = "ADDDTTM" #change name
+MATERIAL = "MATERIAL"
+NOM_DIA_MM = "NOM_DIA_MM"
+INSTALLED = "INSTALLED"
+SUBURB = "SUBURB"
+STATUS = "STATUS"
+INSERV_PROCESS = 'In Service'
+LENG = 'Shape_Leng'
+STR_TYPE = "Street_Type"
+STR_NAME = "Street_Name"
