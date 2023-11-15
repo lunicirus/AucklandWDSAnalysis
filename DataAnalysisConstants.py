@@ -1,6 +1,7 @@
 IRON ='Iron'
 
-DIAMETER = "DIAMETER"
+DIAMETER = 'DIAMETER'
+OTHER = 'Other'
 
 LEN_PERC = '% Lenght'
 
