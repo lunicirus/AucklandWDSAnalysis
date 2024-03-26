@@ -10,30 +10,44 @@ DETECTABLE_FLOW_M3S = 0.250/3600 #m3/s
 DELTA_DAYS = 1 #delta time of one day 
 
 
-def convertmToMPa(pressureInm):
+def convertmToMPa(pressureInm:float)->float:
     
     return pressureInm * W_DENSITY * GRAVITY / (10 ** 6)
 
-def convertMPaTom(pressureInMPa):
-    
-    return pressureInMPa * (10 ** 6)/(W_DENSITY * GRAVITY)
-
-def getMLongFAVAD(crackLength:float,Dint:float,E:float,t:float)->float:
+def getHeadAreaSlopeLong(crackLength:float,diameter:float,E:float,t:float)->float:
     """
         Calculates the head-area slope of a longitudinal leak. 
         Use the equation obtained by Cassa, & van Zyl, J. E. (2013). "Predicting the head-leakage slope of cracks in pipes subject to elastic deformations"
            Journal of Water Supply: Research and Technology - AQUA, 62(4), 214–223. https://doi.org/10.2166/aqua.2013.094
     Args:
         crackLength (float): length of the longitudinal crack in m 
-        Dint (float): internal diameter of the pipe in m #TODO check units
-        E (float): Elasticity modulus of the pipe material #TODO check units
-        t (float): Thickness of the pipe wall in m #TODO check units
-
+        diameter (float): internal diameter of the pipe in m #TODO check if internal
+        E (float): Elasticity modulus of the pipe material in Pa.
+        t (float): Thickness of the pipe wall in m.
     Returns:
-        float: Head-area slope of the longitudinal leak  
-    """    
+        float: Head-area slope of the longitudinal leak in m^2/m
+    """ 
+    try:   
+        m= (2.93157*(diameter**0.3379)*(crackLength**4.8)*(10**(0.5997*(math.log(crackLength,10)**2)))*W_DENSITY*GRAVITY)/(E*(t**1.746))
+    except:
+        print(crackLength,diameter,E,t)
     
-    return (2.93157*(Dint**0.3379)*(crackLength**4.8)*(10**(0.5997*(math.log(crackLength,10)**2)))*W_DENSITY*GRAVITY)/(E*(t**1.746))
+    return m
+
+def calculateQWithFAVAD(Cd:float, h:float, A0:float, m:float)->float:
+    """
+        Calculates the flowrate of a leak at pressure h using the Modified orifice equation or FAVAD.
+    Args:
+        Cd (float): Discharge coeficient of the leak.
+        h (float): Pressure of the pipe in m.
+        A0 (float): Leak area under zero pressure conditions in m^2.
+        mFAVAD (float): Head-area slope of the crack m^2/m.
+    Returns:
+        float : flowrate of the leak in m3/s.
+    """    
+    Q = Cd*((2*GRAVITY)**0.5)*(A0*(h**0.5)+m*(h**1.5))
+
+    return Q
         
 def getPressureToBeDiscover(Cd:float, m:float, A0:float, QDiscoverable:float)->float:
     """
@@ -41,13 +55,12 @@ def getPressureToBeDiscover(Cd:float, m:float, A0:float, QDiscoverable:float)->f
         from solving the FAVAD equation for pressure.
     Args:
         Cd (float): Discharge coefficient of the leak
-        m (float): Head-area slope of the leak 
-        A0 (float): Leak area under zero pressure conditions in m^2 #TODO check this m2 and m of the pressure head resultant
-        QDiscoverable (float): Flow at which the avaliable leak detection technology will detect a leak
+        m (float): Head-area slope of the leak in m^2/m
+        A0 (float): Leak area under zero pressure conditions in m^2 #TODO check units
+        QDiscoverable (float): Flow at which the avaliable leak detection technology will detect a leak in m3/s
     Returns:
         float: Pressure head in m at which the leak would be discoverable
     """    
-    
     C =  Cd*((2*GRAVITY)**0.5) 
 
     a3 = A0**3
@@ -64,30 +77,30 @@ def getPressureToBeDiscover(Cd:float, m:float, A0:float, QDiscoverable:float)->f
     
     return hd
 
-def createCurveUntilDetectable(widthC:float,Cd:float,E:float,Cparis:float,Mparis:float,t:float,Dint:float,lo:float,
-                               nCicles:float,Pmax:float,Pmin:float,nonLeakingL:float=0)->tuple[bool, list[float], list[float], list[float], list[float]]:
+def createCurveUntilDetectable(widthC:float,Cd:float,ElasticityModulus:float,Cparis:float,Mparis:float,Wthickness:float,Dint:float,iniCrackLength:float,
+                               nCycles:float,Pmax:float,Pmin:float,nonLeakingL:float=0)->tuple[bool, list[float], list[float], list[float], list[float]]:
     """
         Calculate the growth of a longitudinal crack due to pressure cycles. Uses Euler to resolve the Paris Equation for
         a cylindrical shell. 
     Args:
         widthC (float): Crack width in m.
         Cd (float): Discharge coeficient of the leak to calculate its flowrate.
-        E (float): Elasticity modulus of the pipe material. #TODO units
-        Cparis (float): C paris constant obtained empirically for the pipe material.
+        ElasticityModulus (float): Elasticity modulus of the pipe material in Pa.
+        Cparis (float): C paris constant obtained empirically for the pipe material in m/cycle/(Mpa m^0.5)^m.
         Mparis (float): m paris constant obtained empirically for the pipe material.
-        t (float): pipe wall thickness in m.
-        Dint (float): pipe Internal diameter in m.
-        lo (float): Initial crack length in m.
-        nCicles (float): number of cycles per day.
+        Wthickness (float): Pipe wall thickness in m.
+        Dint (float): Pipe Internal diameter in m.
+        iniCrackLength (float): Initial crack length in m.
+        nCycles (float): Number of cycles per day.
         Pmax (float): Maximum pressure of the pressure cycle in m.
         Pmin (float): Minimum pressure of the pressure cycle in m.
-        nonLeakingL (float): length of the crack that does not leak. Default is zero.
+        nonLeakingL (float): Length of the crack that does not leak in m. Default is zero.
     Returns:
         tuple[bool, list[float], list[float], list[float], list[float]]: True if the function stoped coz the critical length was 
             reached, false if the discoverable flow rate was reached before the critical length. 
-            List of 
+            List of days. List of pressure indexes in m. List of crack Lengths in m. List of flowrate in m3/s. 
     """    
-    li = lo
+    li = iniCrackLength
     day = 0
     Q=0
     critical = False
@@ -99,46 +112,42 @@ def createCurveUntilDetectable(widthC:float,Cd:float,E:float,Cparis:float,Mparis
     flow=[]
 
     deltaP= convertmToMPa(Pmax-Pmin) #MPa
-    nCiclesPerIter = DELTA_DAYS * nCicles # number of cycles per day
+    nCiclesPerIter = DELTA_DAYS * nCycles # number of cycles per day
     
     #Euler
     while Q < (DETECTABLE_FLOW_M3S + BUFFER_TIME):
 
         #Paris Law------------------------------------------------------------------
-        critical, Y = getGeometricFactorCylindricalShell(t, Dint, li)
+        critical, Y = getGeometricFactorCylindricalShell(Wthickness, Dint, li)
 
         if critical:
             break
         
-        deltaK = getStressIntensityFactor(t, Dint, li, deltaP, Y)
-        
-        #Final lenght of the crack
-        lf = calculateChangeInCrackLength(Cparis, Mparis, nCiclesPerIter, deltaK) + li 
+        deltaK = getStressIntensityFactor(Wthickness, Dint, li, deltaP, Y)
+        lf = calculateChangeInCrackLength(Cparis, Mparis, nCiclesPerIter, deltaK) + li #Final lenght of the crack in m
        
         # FAVAD--- from paper 012---------------------------------------------------
-        lengthLeaking=lf-nonLeakingL  #0.175 #TODO put this value when the method is called
-        leakArea = lengthLeaking*2*widthC
-        mFAVAD = getHeadAreaSlope(E, t, Dint, lengthLeaking)
+        lengthLeaking = lf-nonLeakingL   #m
+        leakArea = lengthLeaking*widthC  #m2
+        mFAVAD = getHeadAreaSlopeLong(lengthLeaking, Dint, ElasticityModulus, Wthickness)
             
-        Q = calculateQWithFAVAD(Cd, Pmax, leakArea, mFAVAD)
+        Q = calculateQWithFAVAD(Cd, Pmax, leakArea, mFAVAD) #m3/s
             
         try:
-            hd = getPressureToBeDiscover(Cd, mFAVAD, leakArea, DETECTABLE_FLOW_M3S)
+            hd = getPressureToBeDiscover(Cd, mFAVAD, leakArea, DETECTABLE_FLOW_M3S) #m
         except:
             print("Flow that is produced at the Pmax: ",Q)
             hd = 0 if (Q>=DETECTABLE_FLOW_M3S) else Exception("Error")
         
-        
+
         Hdetect.append(hd)
         days.append(day)
         leng.append(lf)
         flow.append(Q)
    
-        
         li = lf
         day += DELTA_DAYS
     
-            
         if (day/365)>200:
             print("Too Slow")
             break
@@ -146,16 +155,6 @@ def createCurveUntilDetectable(widthC:float,Cd:float,E:float,Cparis:float,Mparis
     
     return critical, days, Hdetect, leng, flow
 
-def calculateQWithFAVAD(Cd, Pmax, leakArea, mFAVAD):
-    Q = Cd*((2*g)**0.5)*(leakArea*(Pmax**0.5)+mFAVAD*(Pmax**1.5))
-    return Q
-
-def getHeadAreaSlope(E, t, Dint, lengthLeaking):
-    try:
-        mFAVAD = getMLongFAVAD(lengthLeaking*2,Dint,E,t)
-    except:
-        print(lengthLeaking,Dint,E,t)
-    return mFAVAD
 
 def calculateChangeInCrackLength(Cparis:float, Mparis:float, nCycles:int, deltaK:float)->float:
     """
@@ -198,7 +197,10 @@ def getGeometricFactorCylindricalShell(thickness:float, Dint:float, crackLength:
         crackLength (float): Length of the crack in m #TODO check that is not half of the crack length
     Returns:
         tuple[bool,float]: True if it reached the critical length, false otherwise. The value of the geometric factor.
-    """    
+    """ 
+    critical = False  
+    Y = None
+
     lam = crackLength/(Dint*thickness/2)**0.5 #lambda
 
     if lam <= 1:
