@@ -159,52 +159,53 @@ def createCurveUntilDetectable(widthC:float,Cd:float,ElasticityModulus:float,Cpa
 def calculateChangeInCrackLength(Cparis:float, Mparis:float, nCycles:int, deltaK:float)->float:
     """
         Calculates the length change on a longitudinal crack due to nCycles number of pressure cycles.
-        #TODO put paris? 
+        Paris, & Erdogan, F. (1963). A critical analysis of crack propagation laws. Journal of Fluids Engineering, 
+        Transactions of the ASME, 85(4), 528–533. https://doi.org/10.1115/1.3656900
     Args:
         Cparis (float): C paris constant obtained empirically for the pipe material.
         Mparis (float): m paris constant obtained empirically for the pipe material.
         nCycles (int): Number of cycles that provoked the length change.
         deltaK (float): Stress intensity factor of the crack with length before the number of cycles. #TODO put units
     Returns:
-        float: change in crack length due to the number of cycles
+        float: change in crack length due to the number of cycles in m
     """    
-    return (Cparis * deltaK**Mparis )* nCycles
+    return (Cparis * (deltaK**Mparis))* nCycles
 
-def getStressIntensityFactor(thickness:float, Dint:float, crackLength:float, deltaP:float, geometricFactor:float)->float:
+def getStressIntensityFactor(thickness:float, Dint:float, halfCrackLength:float, deltaP:float, geometricFactor:float)->float:
     """
         Calculates the stress intensity factor of a crack given the characteristics of the crack and the pipe.
         #TODO put reference to paper
     Args:
         thickness (float): Wall thickness of the cylindrical shell in m
         Dint (float): Internal diameter of the cylindrical shell in m #TODO check units of everything.
-        crackLength (float): Length of the crack in m #TODO check that is not half of the crack length.
-        deltaP (float): Pressure difference of the fluctuations creating the pressure fatige in MPa #TODO check units.
+        halfCrackLength (float): half the length of the crack in m 
+        deltaP (float): Pressure difference of the fluctuations creating the pressure fatige in MPa 
         geometricFactor (float): geometric factor of a crack on a cylindrical shell. 
     Returns:
-        float: stress intensity factor of the crack
+        float: stress intensity factor of the crack in MPa m^0.5
     """    
-    deltaK = deltaP * Dint / (2*thickness) * geometricFactor * (math.pi * crackLength)**0.5
+    deltaK = deltaP * Dint / (2*thickness) * geometricFactor * (math.pi * halfCrackLength)**0.5
 
     return deltaK
 
-def getGeometricFactorCylindricalShell(thickness:float, Dint:float, crackLength:float)->tuple[bool,float]:
+def getGeometricFactorCylindricalShell(thickness:float, Dint:float, halfCrackLength:float)->tuple[bool,float]:
     """
         Calculates the geometric factor of a crack on a cylindrical shell (pipe, pressure vessel).
         #TODO put the reference to the paper 
     Args:
         thickness (float): Wall thickness of the cylindrical shell in m
         Dint (float): Internal diameter of the cylindrical shell in m #TODO check units of evertyhign
-        crackLength (float): Length of the crack in m #TODO check that is not half of the crack length
+        halfCrackLength (float): half the length of the crack in m 
     Returns:
         tuple[bool,float]: True if it reached the critical length, false otherwise. The value of the geometric factor.
     """ 
     critical = False  
     Y = None
 
-    lam = crackLength/(Dint*thickness/2)**0.5 #lambda
+    lam = halfCrackLength/(Dint*thickness/2)**0.5 #lambda
 
-    if lam <= 1:
-        Y = (1+1.25* lam**2)**0.5   
+    if (lam <= 1) and (lam < 0):
+        Y = (1+(1.25* lam**2))**0.5   
     elif lam <= 5:
         Y = 0.6 + (0.9 * lam)
     else:
