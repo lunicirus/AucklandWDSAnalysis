@@ -78,7 +78,7 @@ def getPressureToBeDiscover(Cd:float, m:float, A0:float, QDiscoverable:float)->f
     return hd
 
 def createCurveUntilDetectable(widthC:float,Cd:float,ElasticityModulus:float,Cparis:float,Mparis:float,Wthickness:float,Dint:float,iniCrackLength:float,
-                               nCycles:float,Pmax:float,Pmin:float,nonLeakingL:float=0)->tuple[bool, list[float], list[float], list[float], list[float]]:
+                               nCycles:float,Pmax:float,deltaP:float,nonLeakingL:float=0)->tuple[bool, list[float], list[float], list[float], list[float]]:
     """
         Calculate the growth of a longitudinal crack due to pressure cycles. Uses Euler to resolve the Paris Equation for
         a cylindrical shell. 
@@ -93,7 +93,7 @@ def createCurveUntilDetectable(widthC:float,Cd:float,ElasticityModulus:float,Cpa
         iniCrackLength (float): Initial crack length in m.
         nCycles (float): Number of cycles per day.
         Pmax (float): Maximum pressure of the pressure cycle in m.
-        Pmin (float): Minimum pressure of the pressure cycle in m.
+        deltaP (float): Delta pressure un MPa
         nonLeakingL (float): Length of the crack that does not leak in m. Default is zero.
     Returns:
         tuple[bool, list[float], list[float], list[float], list[float]]: True if the function stoped coz the critical length was 
@@ -111,7 +111,6 @@ def createCurveUntilDetectable(widthC:float,Cd:float,ElasticityModulus:float,Cpa
     leng=[]
     flow=[]
 
-    deltaP= convertmToMPa(Pmax-Pmin) #MPa
     nCiclesPerIter = DELTA_DAYS * nCycles # number of cycles per day
     
     #Euler
@@ -124,7 +123,9 @@ def createCurveUntilDetectable(widthC:float,Cd:float,ElasticityModulus:float,Cpa
             break
         
         deltaK = getStressIntensityFactor(Wthickness, Dint, li, deltaP, Y)
-        lf = calculateChangeInCrackLength(Cparis, Mparis, nCiclesPerIter, deltaK) + li #Final lenght of the crack in m
+        da = calculateChangeInCrackLength(Cparis, Mparis, nCiclesPerIter, deltaK) 
+        
+        lf = (da - li/2)*2  #Final lenght of the crack in m
        
         # FAVAD--- from paper 012---------------------------------------------------
         lengthLeaking = lf-nonLeakingL   #m
@@ -176,14 +177,15 @@ def getStressIntensityFactor(thickness:float, Dint:float, crackLength:float, del
         #TODO put reference to paper
     Args:
         thickness (float): Wall thickness of the cylindrical shell in m
-        Dint (float): Internal diameter of the cylindrical shell in m #TODO check units of everything.
-        crackLength (float): Length of the crack in m #TODO check that is not half of the crack length.
-        deltaP (float): Pressure difference of the fluctuations creating the pressure fatige in MPa #TODO check units.
+        Dint (float): Internal diameter of the cylindrical shell in m 
+        crackLength (float): Length of the crack in m 
+        deltaP (float): Pressure difference of the fluctuations creating the pressure fatige in MPa 
         geometricFactor (float): geometric factor of a crack on a cylindrical shell. 
     Returns:
-        float: stress intensity factor of the crack
+        float: stress intensity factor of the crack in MPa m^0.5
     """    
-    deltaK = deltaP * Dint / (2*thickness) * geometricFactor * (math.pi * crackLength)**0.5
+    a = crackLength/2
+    deltaK = deltaP * Dint / (2*thickness) * geometricFactor * (math.pi * a)**0.5
 
     return deltaK
 
@@ -194,14 +196,15 @@ def getGeometricFactorCylindricalShell(thickness:float, Dint:float, crackLength:
     Args:
         thickness (float): Wall thickness of the cylindrical shell in m
         Dint (float): Internal diameter of the cylindrical shell in m #TODO check units of evertyhign
-        crackLength (float): Length of the crack in m #TODO check that is not half of the crack length
+        crackLength (float): Length of the crack in m 
     Returns:
         tuple[bool,float]: True if it reached the critical length, false otherwise. The value of the geometric factor.
     """ 
     critical = False  
     Y = None
 
-    lam = crackLength/(Dint*thickness/2)**0.5 #lambda
+    a = crackLength/2
+    lam = a/(Dint*thickness/2)**0.5 #lambda
 
     if lam <= 1:
         Y = (1+1.25* lam**2)**0.5   
